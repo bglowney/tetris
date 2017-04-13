@@ -1,0 +1,18 @@
+{
+  "name": "taco-bell-tetris",
+  "version": "1.0.0",
+  "description": "Tetris implementation using taco-bell framework",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/bglowney/tetris.git"
+  },
+  "author": "bglowney",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/bglowney/tetris/issues"
+  },
+  "homepage": "https://github.com/bglowney/tetris#readme",
+  "dependencies": {
+    "taco-bell": "^1.1.7"
+  }
+}

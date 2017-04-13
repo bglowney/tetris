@@ -1,0 +1,6 @@
+#!/bin/bash
+
+# remove all built js files
+# fails silently
+
+rm ./src/*.js > /dev/null 2>&1
