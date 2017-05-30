@@ -4,6 +4,8 @@ var AbstractComponent_1 = require("./src/AbstractComponent");
 exports.AbstractComponent = AbstractComponent_1.AbstractComponent;
 var AbstractElement_1 = require("./src/AbstractElement");
 exports.AbstractElement = AbstractElement_1.AbstractElement;
+var ComponentQueue_1 = require("./src/ComponentQueue");
+exports.ComponentQueue = ComponentQueue_1.ComponentQueue;
 var Binding_1 = require("./src/Binding");
 exports.Binding = Binding_1.Binding;
 exports.persist = Binding_1.persist;
@@ -18,6 +20,8 @@ var FunctionalComponent_1 = require("./src/FunctionalComponent");
 exports.FunctionalElement = FunctionalComponent_1.FunctionalElement;
 var ModelArray_1 = require("./src/ModelArray");
 exports.ModelArray = ModelArray_1.ModelArray;
+var ModelObject_1 = require("./src/ModelObject");
+exports.ModelObject = ModelObject_1.ModelObject;
 var ModelCollection_1 = require("./src/ModelCollection");
 exports.ModelCollection = ModelCollection_1.ModelCollection;
 var ModelElement_1 = require("./src/ModelElement");
@@ -27,20 +31,24 @@ exports.SVGCollection = SVGCollection_1.SVGCollection;
 var SVGComponent_1 = require("./src/SVGComponent");
 exports.SVGComponent = SVGComponent_1.SVGComponent;
 
-},{"./src/AbstractComponent":2,"./src/AbstractElement":3,"./src/Binding":4,"./src/Collection":5,"./src/Component":6,"./src/FunctionalComponent":7,"./src/ModelArray":8,"./src/ModelCollection":9,"./src/ModelElement":10,"./src/SVGCollection":11,"./src/SVGComponent":12}],2:[function(require,module,exports){
+},{"./src/AbstractComponent":2,"./src/AbstractElement":3,"./src/Binding":4,"./src/Collection":5,"./src/Component":6,"./src/ComponentQueue":7,"./src/FunctionalComponent":8,"./src/ModelArray":9,"./src/ModelCollection":10,"./src/ModelElement":11,"./src/ModelObject":12,"./src/SVGCollection":13,"./src/SVGComponent":14}],2:[function(require,module,exports){
 "use strict";
 const Binding_1 = require("./Binding");
+const AbstractElement_1 = require("./AbstractElement");
 const ModelElement_1 = require("./ModelElement");
+const ComponentQueue_1 = require("./ComponentQueue");
 class AbstractComponent {
     constructor(tagName, parent, namespace) {
+        this.destroyed = false;
         if (!namespace)
-            this.element = document.createElement(tagName || "div");
+            this.element = window.document.createElement(tagName || "div");
         else
-            this.element = document.createElementNS(namespace, tagName);
+            this.element = window.document.createElementNS(namespace, tagName);
         if (parent != undefined) {
             this.parent = parent;
             parent.appendChild(this.element);
         }
+        ComponentQueue_1.ComponentQueue.add(this);
     }
     getElement() {
         return this.element;
@@ -51,30 +59,46 @@ class AbstractComponent {
     setParent(parent) {
         this.parent = parent;
     }
-    reinit() {
-        this.updateClass();
-        this.updateText();
-        if (this.attrs) {
-            for (let name in this.attrs) {
-                this.updateAttribute(name);
+    getParent() {
+        return this.parent;
+    }
+    reinit(immediate = false) {
+        if (immediate) {
+            this.updateClass();
+            this.updateText();
+            if (this.attrs) {
+                for (let name in this.attrs) {
+                    this.updateAttribute(name);
+                }
             }
+            this.updateValue();
         }
-        this.updateValue();
-        return this;
+        else {
+            ComponentQueue_1.ComponentQueue.add(this);
+        }
+    }
+    _isDestroyed() {
+        return this.destroyed;
+    }
+    _remove() {
+        if (this.element.parentElement)
+            this.element.parentElement.removeChild(this.element);
     }
     destroy() {
-        this.element.parentElement.removeChild(this.element);
+        this.destroyed = true;
+        ComponentQueue_1.ComponentQueue.add(this);
     }
     withClass(...classes) {
         if (!this.classes)
             this.classes = new Set();
         for (let cls of classes) {
             this.classes.add(cls);
-            if (cls instanceof ModelElement_1.ModelElement)
-                cls.registerCallback(this, this.withClass.bind(this));
+            if (cls instanceof AbstractElement_1.AbstractElement) {
+                cls.registerCallback(this, ComponentQueue_1.ComponentQueue.add.bind(ComponentQueue_1.ComponentQueue, this));
+            }
             else if (cls instanceof Binding_1.Binding) {
                 let binding = cls;
-                binding.model.registerCallback(this, this.updateClass.bind(this));
+                binding.model.registerCallback(this, ComponentQueue_1.ComponentQueue.add.bind(ComponentQueue_1.ComponentQueue, this));
             }
         }
         return this;
@@ -87,7 +111,7 @@ class AbstractComponent {
             if (typeof cp == "string") {
                 classNames.push(cp);
             }
-            else if (cp instanceof ModelElement_1.ModelElement) {
+            else if (cp instanceof AbstractElement_1.AbstractElement) {
                 classNames.push(cp.get());
             }
             else {
@@ -100,7 +124,7 @@ class AbstractComponent {
     removeClass(...classes) {
         if (this.classes) {
             for (let cls of classes) {
-                if (cls instanceof ModelElement_1.ModelElement) {
+                if (cls instanceof AbstractElement_1.AbstractElement) {
                     cls.unregisterCallback(this, this.updateClass.bind(this));
                 }
                 else if (cls instanceof Binding_1.Binding) {
@@ -114,12 +138,12 @@ class AbstractComponent {
     }
     withText(text) {
         this.text = text;
-        if (text instanceof ModelElement_1.ModelElement) {
-            text.registerCallback(this, this.updateText.bind(this));
+        if (text instanceof AbstractElement_1.AbstractElement) {
+            text.registerCallback(this, ComponentQueue_1.ComponentQueue.add.bind(ComponentQueue_1.ComponentQueue, this));
         }
         else if (this.text instanceof Binding_1.Binding) {
             let binding = text;
-            binding.model.registerCallback(this, this.updateText.bind(this));
+            binding.model.registerCallback(this, ComponentQueue_1.ComponentQueue.add.bind(ComponentQueue_1.ComponentQueue, this));
         }
         return this;
     }
@@ -128,7 +152,7 @@ class AbstractComponent {
             let text;
             if (typeof this.text == "string")
                 text = this.text;
-            else if (this.text instanceof ModelElement_1.ModelElement) {
+            else if (this.text instanceof AbstractElement_1.AbstractElement) {
                 text = this.text.get();
             }
             else {
@@ -140,7 +164,7 @@ class AbstractComponent {
     }
     removeText() {
         if (this.text != undefined) {
-            if (this.text instanceof ModelElement_1.ModelElement)
+            if (this.text instanceof AbstractElement_1.AbstractElement)
                 this.text.unregisterCallback(this, this.updateText.bind(this));
             else if (this.text instanceof Binding_1.Binding) {
                 let binding = this.text;
@@ -159,25 +183,25 @@ class AbstractComponent {
             valueProp = inputType == "checkbox" || inputType == "radio" ? "checked" : "value";
         }
         if (value instanceof ModelElement_1.ModelElement) {
-            value.registerCallback(this, this.updateValue.bind(this));
-            this.element.onchange = function () {
+            value.registerCallback(this, ComponentQueue_1.ComponentQueue.add.bind(ComponentQueue_1.ComponentQueue, this));
+            this.on("change", function () {
                 setInputType.call(this);
                 value.set(this.element[valueProp]);
-            }.bind(this);
+            }.bind(this));
         }
         else if (this.value instanceof Binding_1.TwoWayBinding) {
             let binding = value;
-            binding.model.registerCallback(this, this.updateValue.bind(this));
-            this.element.onchange = function () {
+            binding.model.registerCallback(this, ComponentQueue_1.ComponentQueue.add.bind(ComponentQueue_1.ComponentQueue, this));
+            this.on("change", function () {
                 setInputType.call(this);
                 binding.model.set(binding.onUserUpdate(this.element[valueProp]));
-            }.bind(this);
+            }.bind(this));
         }
         return this;
     }
     removeValue() {
         if (this.value != undefined) {
-            if (this.value instanceof ModelElement_1.ModelElement) {
+            if (this.value instanceof AbstractElement_1.AbstractElement) {
                 this.value.unregisterCallback(this, this.updateValue.bind(this));
             }
             else if (this.value instanceof Binding_1.Binding) {
@@ -197,7 +221,7 @@ class AbstractComponent {
             if (!(typeof this.value == "object")) {
                 value = this.value;
             }
-            else if (this.value instanceof ModelElement_1.ModelElement) {
+            else if (this.value instanceof AbstractElement_1.AbstractElement) {
                 value = this.value.get();
             }
             else {
@@ -211,12 +235,12 @@ class AbstractComponent {
         if (!this.attrs)
             this.attrs = {};
         this.attrs[name] = value;
-        if (value instanceof ModelElement_1.ModelElement) {
-            value.registerCallback(this, this.updateAttribute.bind(this, name));
+        if (value instanceof AbstractElement_1.AbstractElement) {
+            value.registerCallback(this, ComponentQueue_1.ComponentQueue.add.bind(ComponentQueue_1.ComponentQueue, this));
         }
         else if (value instanceof Binding_1.Binding) {
             let binding = value;
-            binding.model.registerCallback(this, this.updateAttribute.bind(this, name));
+            binding.model.registerCallback(this, ComponentQueue_1.ComponentQueue.add.bind(ComponentQueue_1.ComponentQueue, this));
         }
         return this;
     }
@@ -224,7 +248,7 @@ class AbstractComponent {
         if (this.attrs != undefined) {
             if (this.attrs[name] != undefined) {
                 let value = this.attrs[name];
-                if (value instanceof ModelElement_1.ModelElement) {
+                if (value instanceof AbstractElement_1.AbstractElement) {
                     value.unregisterCallback(this, this.updateAttribute.bind(this, name));
                 }
                 else {
@@ -241,7 +265,7 @@ class AbstractComponent {
         if (this.attrs) {
             if (this.attrs[name] != undefined) {
                 let value = this.attrs[name];
-                if (value instanceof ModelElement_1.ModelElement) {
+                if (value instanceof AbstractElement_1.AbstractElement) {
                     value = value.get();
                 }
                 else if (value instanceof Binding_1.Binding) {
@@ -253,7 +277,10 @@ class AbstractComponent {
         }
     }
     on(eventName, eventHandler) {
-        this.element.addEventListener(eventName, eventHandler.bind(this));
+        this.element.addEventListener(eventName, (event) => {
+            eventHandler.call(this, event);
+            ComponentQueue_1.ComponentQueue.cycle();
+        });
         return this;
     }
     off(eventName) {
@@ -275,8 +302,9 @@ class AbstractComponent {
 }
 exports.AbstractComponent = AbstractComponent;
 
-},{"./Binding":4,"./ModelElement":10}],3:[function(require,module,exports){
+},{"./AbstractElement":3,"./Binding":4,"./ComponentQueue":7,"./ModelElement":11}],3:[function(require,module,exports){
 "use strict";
+const ComponentQueue_1 = require("./ComponentQueue");
 class AbstractElement {
     destroy() {
         if (!this.boundComponents)
@@ -318,11 +346,15 @@ class AbstractElement {
             for (let callback of callbackSet.values())
                 callback(this.get());
         }
+        for (let key of this.updateCallbacks.keys()) {
+            if (ComponentQueue_1._instanceofQueableComponent(key))
+                ComponentQueue_1.ComponentQueue.add(key);
+        }
     }
 }
 exports.AbstractElement = AbstractElement;
 
-},{}],4:[function(require,module,exports){
+},{"./ComponentQueue":7}],4:[function(require,module,exports){
 "use strict";
 const ModelElement_1 = require("./ModelElement");
 const ModelArray_1 = require("./ModelArray");
@@ -403,27 +435,32 @@ function persist(constructor) {
 }
 exports.persist = persist;
 
-},{"./ModelArray":8,"./ModelElement":10}],5:[function(require,module,exports){
+},{"./ModelArray":9,"./ModelElement":11}],5:[function(require,module,exports){
 "use strict";
-const AbstractComponent_1 = require("./AbstractComponent");
 const ModelArray_1 = require("./ModelArray");
-class Collection extends AbstractComponent_1.AbstractComponent {
+const Component_1 = require("./Component");
+class Collection extends Component_1.Component {
     children(model, onAddCallback) {
         model.registerAddCallback(this, function (newItem) {
             let i = model instanceof ModelArray_1.ModelArray ? model.size.get() : "";
             let newComponent = onAddCallback(newItem, i);
             newItem.bindComponent(newComponent);
-            this.element.appendChild(newComponent.getElement());
+            this.child(newComponent);
         }.bind(this));
         return this;
     }
 }
 exports.Collection = Collection;
 
-},{"./AbstractComponent":2,"./ModelArray":8}],6:[function(require,module,exports){
+},{"./Component":6,"./ModelArray":9}],6:[function(require,module,exports){
 "use strict";
 const AbstractComponent_1 = require("./AbstractComponent");
+const ComponentQueue_1 = require("./ComponentQueue");
 class Component extends AbstractComponent_1.AbstractComponent {
+    constructor() {
+        super(...arguments);
+        this.addedChildren = new Set();
+    }
     child(x) {
         let components;
         if (x instanceof Array)
@@ -432,14 +469,93 @@ class Component extends AbstractComponent_1.AbstractComponent {
             components = Array.prototype.slice.call(arguments);
         for (let component of components) {
             component.setParent(this);
-            this.element.appendChild(component.getElement());
+            this.addedChildren.add(component);
         }
+        ComponentQueue_1.ComponentQueue.add(this);
         return this;
+    }
+    reinit(immediate = false) {
+        super.reinit(immediate);
+        this.flushChildren();
+    }
+    flushChildren() {
+        for (let child of this.addedChildren.values())
+            this.element.appendChild(child.getElement());
+        this.addedChildren.clear();
     }
 }
 exports.Component = Component;
 
-},{"./AbstractComponent":2}],7:[function(require,module,exports){
+},{"./AbstractComponent":2,"./ComponentQueue":7}],7:[function(require,module,exports){
+"use strict";
+function _instanceofQueableComponent(obj) {
+    return 'getParent' in obj
+        && '_isDestroyed' in obj
+        && '_remove' in obj
+        && 'reinit' in obj;
+}
+exports._instanceofQueableComponent = _instanceofQueableComponent;
+class _ComponentQueue {
+    constructor() {
+        this.queue = new Set();
+    }
+    add(component) {
+        this.queue.add(component);
+        this.resolveAncestor(component);
+    }
+    cycle() {
+        const queueToExecute = this.queue;
+        this.queue = new Set();
+        const cycleRootToExecute = this.cycleRoot;
+        this.cycleRoot = null;
+        if (queueToExecute.size == 0)
+            return;
+        let rootParent = cycleRootToExecute.getParent();
+        let rootParentElement;
+        if (rootParent instanceof Element)
+            rootParentElement = rootParent;
+        else
+            rootParentElement = rootParent.getElement();
+        var nextSibling = cycleRootToExecute.getElement().nextSibling;
+        rootParentElement.removeChild(cycleRootToExecute.getElement());
+        if (cycleRootToExecute._isDestroyed())
+            return;
+        for (let item of queueToExecute.values()) {
+            if (_instanceofQueableComponent(item)) {
+                let component = item;
+                if (component._isDestroyed())
+                    component._remove();
+                else
+                    component.reinit(true);
+            }
+            else {
+                let element = item;
+                element.doUpdate();
+            }
+        }
+        if (nextSibling)
+            rootParentElement.insertBefore(cycleRootToExecute.getElement(), nextSibling);
+        else
+            rootParentElement.appendChild(cycleRootToExecute.getElement());
+    }
+    resolveAncestor(other) {
+        if (!this.cycleRoot) {
+            this.cycleRoot = other;
+            return;
+        }
+        let ancestor = other;
+        while (ancestor && !(ancestor instanceof Element) &&
+            (ancestor = ancestor.getParent())) {
+            if (ancestor === this.cycleRoot)
+                return;
+        }
+        this.cycleRoot = other;
+    }
+}
+exports._ComponentQueue = _ComponentQueue;
+exports.ComponentQueue = new _ComponentQueue();
+
+},{}],8:[function(require,module,exports){
 "use strict";
 const AbstractElement_1 = require("./AbstractElement");
 class FunctionalElement extends AbstractElement_1.AbstractElement {
@@ -461,7 +577,7 @@ class FunctionalElement extends AbstractElement_1.AbstractElement {
 }
 exports.FunctionalElement = FunctionalElement;
 
-},{"./AbstractElement":3}],8:[function(require,module,exports){
+},{"./AbstractElement":3}],9:[function(require,module,exports){
 "use strict";
 const ModelCollection_1 = require("./ModelCollection");
 const ModelElement_1 = require("./ModelElement");
@@ -509,7 +625,7 @@ class ModelArray extends ModelCollection_1.ModelCollection {
 }
 exports.ModelArray = ModelArray;
 
-},{"./ModelCollection":9,"./ModelElement":10}],9:[function(require,module,exports){
+},{"./ModelCollection":10,"./ModelElement":11}],10:[function(require,module,exports){
 "use strict";
 const ModelElement_1 = require("./ModelElement");
 class ModelCollection extends ModelElement_1.ModelElement {
@@ -537,7 +653,7 @@ class ModelCollection extends ModelElement_1.ModelElement {
 }
 exports.ModelCollection = ModelCollection;
 
-},{"./ModelElement":10}],10:[function(require,module,exports){
+},{"./ModelElement":11}],11:[function(require,module,exports){
 "use strict";
 const AbstractElement_1 = require("./AbstractElement");
 class ModelElement extends AbstractElement_1.AbstractElement {
@@ -559,7 +675,43 @@ class ModelElement extends AbstractElement_1.AbstractElement {
 }
 exports.ModelElement = ModelElement;
 
-},{"./AbstractElement":3}],11:[function(require,module,exports){
+},{"./AbstractElement":3}],12:[function(require,module,exports){
+"use strict";
+const ModelCollection_1 = require("./ModelCollection");
+const ModelElement_1 = require("./ModelElement");
+class ModelObject extends ModelCollection_1.ModelCollection {
+    constructor(obj) {
+        super({});
+        for (let k in obj) {
+            this.put(k, obj[k]);
+        }
+    }
+    put(key, member) {
+        if (!this.addCallbacks)
+            this.addCallbacks = new Map();
+        let newMember = new ModelElement_1.ModelElement(member);
+        this.data[key] = newMember;
+        for (let callbackSet of this.addCallbacks.values()) {
+            for (let callback of callbackSet.values()) {
+                callback(newMember, key);
+            }
+        }
+        return this;
+    }
+    remove(member) {
+        for (let key in this.data) {
+            let item = this.data[key];
+            if (member === item) {
+                delete this.data[key];
+                member.destroy();
+            }
+        }
+        return this;
+    }
+}
+exports.ModelObject = ModelObject;
+
+},{"./ModelCollection":10,"./ModelElement":11}],13:[function(require,module,exports){
 "use strict";
 const Collection_1 = require("./Collection");
 const ModelElement_1 = require("./ModelElement");
@@ -600,7 +752,7 @@ class SVGCollection extends Collection_1.Collection {
 }
 exports.SVGCollection = SVGCollection;
 
-},{"./Collection":5,"./ModelElement":10}],12:[function(require,module,exports){
+},{"./Collection":5,"./ModelElement":11}],14:[function(require,module,exports){
 "use strict";
 const Component_1 = require("./Component");
 const ModelElement_1 = require("./ModelElement");
@@ -641,7 +793,7 @@ class SVGComponent extends Component_1.Component {
 }
 exports.SVGComponent = SVGComponent;
 
-},{"./Component":6,"./ModelElement":10}],13:[function(require,module,exports){
+},{"./Component":6,"./ModelElement":11}],15:[function(require,module,exports){
 "use strict";
 const index_1 = require("../node_modules/taco-bell/index");
 class BlockModel extends index_1.ModelElement {
@@ -654,7 +806,7 @@ class BlockModel extends index_1.ModelElement {
 BlockModel.SIDE_LENGTH = 25;
 exports.BlockModel = BlockModel;
 
-},{"../node_modules/taco-bell/index":1}],14:[function(require,module,exports){
+},{"../node_modules/taco-bell/index":1}],16:[function(require,module,exports){
 "use strict";
 const PieceModel_1 = require("./PieceModel");
 const BlockModel_1 = require("./BlockModel");
@@ -670,7 +822,7 @@ class LPieceModel extends PieceModel_1.PieceModel {
 }
 exports.LPieceModel = LPieceModel;
 
-},{"./BlockModel":13,"./PieceModel":17}],15:[function(require,module,exports){
+},{"./BlockModel":15,"./PieceModel":19}],17:[function(require,module,exports){
 "use strict";
 const PieceModel_1 = require("./PieceModel");
 const BlockModel_1 = require("./BlockModel");
@@ -686,7 +838,7 @@ class LongPieceModel extends PieceModel_1.PieceModel {
 }
 exports.LongPieceModel = LongPieceModel;
 
-},{"./BlockModel":13,"./PieceModel":17}],16:[function(require,module,exports){
+},{"./BlockModel":15,"./PieceModel":19}],18:[function(require,module,exports){
 "use strict";
 const index_1 = require("../node_modules/taco-bell/index");
 const BlockModel_1 = require("./BlockModel");
@@ -700,8 +852,7 @@ class Piece {
                 .withAttribute("y", blockModel.y)
                 .withAttribute("width", BlockModel_1.BlockModel.SIDE_LENGTH)
                 .withAttribute("height", BlockModel_1.BlockModel.SIDE_LENGTH)
-                .withAttribute("style", "stroke: #000000; fill: " + color + ";")
-                .reinit();
+                .withAttribute("style", "stroke: #000000; fill: " + color + ";");
             blockModel.bindComponent(blockComponent);
             this.blocks.push(blockComponent);
         }
@@ -713,7 +864,7 @@ class Piece {
 Piece.COLORS = ['#FFAA55', '#AAFF55', '#AA55FF', '#FF55AA', '#55FFAA', '#55AAFF'];
 exports.Piece = Piece;
 
-},{"../node_modules/taco-bell/index":1,"./BlockModel":13}],17:[function(require,module,exports){
+},{"../node_modules/taco-bell/index":1,"./BlockModel":15}],19:[function(require,module,exports){
 "use strict";
 const BlockModel_1 = require("./BlockModel");
 const shared_1 = require("./shared");
@@ -805,7 +956,7 @@ class PieceModel {
 }
 exports.PieceModel = PieceModel;
 
-},{"./BlockModel":13,"./shared":22}],18:[function(require,module,exports){
+},{"./BlockModel":15,"./shared":24}],20:[function(require,module,exports){
 "use strict";
 const PieceModel_1 = require("./PieceModel");
 const BlockModel_1 = require("./BlockModel");
@@ -821,7 +972,7 @@ class PyramdPieceModel extends PieceModel_1.PieceModel {
 }
 exports.PyramdPieceModel = PyramdPieceModel;
 
-},{"./BlockModel":13,"./PieceModel":17}],19:[function(require,module,exports){
+},{"./BlockModel":15,"./PieceModel":19}],21:[function(require,module,exports){
 "use strict";
 const PieceModel_1 = require("./PieceModel");
 const BlockModel_1 = require("./BlockModel");
@@ -837,7 +988,7 @@ class SPieceBlockModel extends PieceModel_1.PieceModel {
 }
 exports.SPieceBlockModel = SPieceBlockModel;
 
-},{"./BlockModel":13,"./PieceModel":17}],20:[function(require,module,exports){
+},{"./BlockModel":15,"./PieceModel":19}],22:[function(require,module,exports){
 "use strict";
 const PieceModel_1 = require("./PieceModel");
 const BlockModel_1 = require("./BlockModel");
@@ -855,7 +1006,7 @@ class SquarePieceModel extends PieceModel_1.PieceModel {
 }
 exports.SquarePieceModel = SquarePieceModel;
 
-},{"./BlockModel":13,"./PieceModel":17}],21:[function(require,module,exports){
+},{"./BlockModel":15,"./PieceModel":19}],23:[function(require,module,exports){
 "use strict";
 const PieceModel_1 = require("./PieceModel");
 const BlockModel_1 = require("./BlockModel");
@@ -871,7 +1022,7 @@ class ZPieceBlockModel extends PieceModel_1.PieceModel {
 }
 exports.ZPieceBlockModel = ZPieceBlockModel;
 
-},{"./BlockModel":13,"./PieceModel":17}],22:[function(require,module,exports){
+},{"./BlockModel":15,"./PieceModel":19}],24:[function(require,module,exports){
 "use strict";
 exports.gameWidth = 8;
 exports.gameHeight = 15;
@@ -883,9 +1034,10 @@ var Direction;
     Direction[Direction["AUTO_DOWN"] = 3] = "AUTO_DOWN";
 })(Direction = exports.Direction || (exports.Direction = {}));
 
-},{}],23:[function(require,module,exports){
+},{}],25:[function(require,module,exports){
 "use strict";
 const index_1 = require("../node_modules/taco-bell/index");
+const index_2 = require("../node_modules/taco-bell/index");
 const Piece_1 = require("./Piece");
 const BlockModel_1 = require("./BlockModel");
 const shared_1 = require("./shared");
@@ -894,11 +1046,11 @@ const SPieceModel_1 = require("./SPieceModel");
 const ZPieceBlockModel_1 = require("./ZPieceBlockModel");
 const LPieceModel_1 = require("./LPieceModel");
 const LongPieceModel_1 = require("./LongPieceModel");
-const index_2 = require("../node_modules/taco-bell/index");
 const index_3 = require("../node_modules/taco-bell/index");
 const index_4 = require("../node_modules/taco-bell/index");
-const PyramidPieceModel_1 = require("./PyramidPieceModel");
 const index_5 = require("../node_modules/taco-bell/index");
+const PyramidPieceModel_1 = require("./PyramidPieceModel");
+const index_6 = require("../node_modules/taco-bell/index");
 const LEFT_KEYCODE = 37;
 const UP_KEYCODE = 38;
 const RIGHT_KEYCODE = 39;
@@ -937,16 +1089,16 @@ var State;
 })(State || (State = {}));
 class TetrisModel {
     constructor() {
-        this.message = new index_3.ModelElement();
-        this.showMessage = new index_3.ModelElement(false);
-        this.state = new index_3.ModelElement(State.INIT);
-        this.score = new index_3.ModelElement(0);
-        this.pieceCount = new index_3.ModelElement(0);
-        this.lineCount = new index_3.ModelElement(0);
-        this.level = new index_5.FunctionalElement(function (pieceCount) {
+        this.message = new index_4.ModelElement();
+        this.showMessage = new index_4.ModelElement(false);
+        this.state = new index_4.ModelElement(State.INIT);
+        this.score = new index_4.ModelElement(0);
+        this.pieceCount = new index_4.ModelElement(0);
+        this.lineCount = new index_4.ModelElement(0);
+        this.level = new index_6.FunctionalElement(function (pieceCount) {
             return Math.ceil((pieceCount + 1) / PIECES_PER_LEVEL);
         }, this.pieceCount);
-        this.tickLength = new index_5.FunctionalElement(function (level) {
+        this.tickLength = new index_6.FunctionalElement(function (level) {
             return 1000 / Math.log2(level + 1);
         }, this.level);
     }
@@ -994,57 +1146,49 @@ class Tetris {
                     this.pause();
                     break;
             }
+            index_1.ComponentQueue.cycle();
         });
-        this.svg = new index_1.SVGComponent("svg")
+        this.svg = new index_2.SVGComponent("svg")
             .withAttribute("width", BlockModel_1.BlockModel.SIDE_LENGTH * shared_1.gameWidth)
             .withAttribute("height", BlockModel_1.BlockModel.SIDE_LENGTH * shared_1.gameHeight)
-            .child(new index_1.SVGComponent("rect")
+            .child(new index_2.SVGComponent("rect")
             .withAttribute("x", 0)
             .withAttribute("y", 0)
             .withAttribute("width", BlockModel_1.BlockModel.SIDE_LENGTH * shared_1.gameWidth)
             .withAttribute("height", BlockModel_1.BlockModel.SIDE_LENGTH * shared_1.gameHeight)
-            .withAttribute("style", "fill: #000000;")
-            .reinit())
-            .reinit();
-        new index_2.Component("div", document.getElementById("app-root"))
+            .withAttribute("style", "fill: #000000;"));
+        new index_3.Component("div", document.getElementById("app-root"))
             .withClass("game")
-            .child(new index_2.Component("div")
+            .child(new index_3.Component("div")
             .withClass("header")
-            .child(new index_2.Component("span")
+            .child(new index_3.Component("span")
             .withClass("score"))
-            .child(new index_2.Component("span")
+            .child(new index_3.Component("span")
             .withText("Start")
-            .withClass("btn start", new index_4.Binding(this.model.state, function (state) {
+            .withClass("btn start", new index_5.Binding(this.model.state, function (state) {
             return state == State.INIT || state == State.GAMEOVER ? "" : "hidden";
-        })).on("click", this.restart.bind(this))
-            .reinit(), new index_2.Component("span")
-            .withClass("level", new index_4.Binding(this.model.state, function (state) {
+        })).on("click", this.restart.bind(this)), new index_3.Component("span")
+            .withClass("level", new index_5.Binding(this.model.state, function (state) {
             return state == State.INIT || state == State.GAMEOVER ? "hidden" : "";
         }))
-            .withText(new index_4.Binding(this.model.level, function (level) {
+            .withText(new index_5.Binding(this.model.level, function (level) {
             return "Level " + level;
-        }))
-            .reinit(), new index_2.Component("label")
+        })), new index_3.Component("label")
             .withClass("score")
-            .withText(this.model.score)
-            .reinit(), new index_2.Component("label")
+            .withText(this.model.score), new index_3.Component("label")
             .withClass("line-count")
-            .withText(this.model.lineCount)
-            .reinit(), new index_2.Component("span")
-            .withText(new index_4.Binding(this.model.state, function (state) {
+            .withText(this.model.lineCount), new index_3.Component("span")
+            .withText(new index_5.Binding(this.model.state, function (state) {
             return state == State.PAUSED ? "Resume" : "Pause";
         }))
             .withClass("btn pause")
-            .on("click", this.pause.bind(this))
-            .reinit()).reinit()
-            .child(new index_2.Component("h1")
+            .on("click", this.pause.bind(this)))
+            .child(new index_3.Component("h1")
             .withText(this.model.message)
-            .withClass("message", new index_4.Binding(this.model.showMessage, function (showing) {
+            .withClass("message", new index_5.Binding(this.model.showMessage, function (showing) {
             return showing ? "" : "hidden";
-        }))
-            .reinit())).reinit()
-            .child(this.svg)
-            .reinit();
+        }))))
+            .child(this.svg);
     }
     restart() {
         if (this.timeoutHandle)
@@ -1087,6 +1231,7 @@ class Tetris {
                     return;
                 }
             }
+            index_1.ComponentQueue.cycle();
             this.model.currentPiece.move(this, shared_1.Direction.DOWN);
             this.tick();
         }.bind(this), this.model.tickLength.get());
@@ -1174,6 +1319,7 @@ class Tetris {
 }
 exports.Tetris = Tetris;
 const tetris = new Tetris();
+index_1.ComponentQueue.cycle();
 window["tetris"] = tetris;
 
-},{"../node_modules/taco-bell/index":1,"./BlockModel":13,"./LPieceModel":14,"./LongPieceModel":15,"./Piece":16,"./PyramidPieceModel":18,"./SPieceModel":19,"./SquarePieceModel":20,"./ZPieceBlockModel":21,"./shared":22}]},{},[23]);
+},{"../node_modules/taco-bell/index":1,"./BlockModel":15,"./LPieceModel":16,"./LongPieceModel":17,"./Piece":18,"./PyramidPieceModel":20,"./SPieceModel":21,"./SquarePieceModel":22,"./ZPieceBlockModel":23,"./shared":24}]},{},[25]);

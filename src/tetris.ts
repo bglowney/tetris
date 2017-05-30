@@ -1,3 +1,4 @@
+import {ComponentQueue} from "../node_modules/taco-bell/index";
 import {SVGComponent} from "../node_modules/taco-bell/index";
 import {Piece} from "./Piece";
 import {PieceModel} from "./PieceModel";
@@ -125,6 +126,7 @@ export class Tetris {
                 //     this.restart();
                 //     break;
             }
+            ComponentQueue.cycle();
         });
         this.svg = new SVGComponent("svg")
             .withAttribute("width",BlockModel.SIDE_LENGTH * gameWidth)
@@ -136,9 +138,7 @@ export class Tetris {
                     .withAttribute("width",BlockModel.SIDE_LENGTH * gameWidth)
                     .withAttribute("height",BlockModel.SIDE_LENGTH * gameHeight)
                     .withAttribute("style","fill: #000000;")
-                    .reinit()
-            )
-            .reinit();
+            );
         new Component("div", document.getElementById("app-root"))
             .withClass("game")
             .child (new Component ("div")
@@ -155,43 +155,36 @@ export class Tetris {
                             new Binding<State,string>(this.model.state, function (state: State): string {
                                 return state == State.INIT || state == State.GAMEOVER ? "" : "hidden";
                             })
-                        ).on("click", this.restart.bind(this))
-                        .reinit(),
+                        ).on("click", this.restart.bind(this)),
                     new Component("span")
                         .withClass("level", new Binding<State,string>(this.model.state, function (state: State): string {
                             return state == State.INIT || state == State.GAMEOVER ? "hidden" : "";
                         }))
                         .withText(new Binding<number,string>(this.model.level, function (level: number) {
                             return "Level " + level;
-                        }))
-                        .reinit(),
+                        })),
                     new Component("label")
                         .withClass("score")
-                        .withText(this.model.score)
-                        .reinit(),
+                        .withText(this.model.score),
                     new Component("label")
                         .withClass("line-count")
-                        .withText(this.model.lineCount)
-                        .reinit(),
+                        .withText(this.model.lineCount),
                     new Component("span")
                         .withText(new Binding<State, string>(this.model.state, function (state: State) {
                             return state == State.PAUSED ? "Resume" : "Pause"
                         }))
                         .withClass("btn pause")
                         .on("click", this.pause.bind(this))
-                        .reinit()
-                ).reinit()
+                )
                 .child(
                     new Component("h1")
                         .withText(this.model.message)
                         .withClass("message", new Binding<boolean,string>(this.model.showMessage, function (showing: boolean) {
                             return showing ? "" : "hidden";
                         }))
-                        .reinit()
                 )
-            ).reinit()
-            .child(this.svg)
-            .reinit();
+            )
+            .child(this.svg);
     }
 
     protected restart(): void {
@@ -236,6 +229,7 @@ export class Tetris {
                     return;
                 }
             }
+            ComponentQueue.cycle();
             this.model.currentPiece.move(this, Direction.DOWN);
             this.tick();
         }.bind(this),this.model.tickLength.get());
@@ -331,5 +325,7 @@ export class Tetris {
 }
 
 const tetris = new Tetris();
+
+ComponentQueue.cycle();
 
 window["tetris"] = tetris;

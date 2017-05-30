@@ -1,5 +1,6 @@
 "use strict";
 const index_1 = require("../node_modules/taco-bell/index");
+const index_2 = require("../node_modules/taco-bell/index");
 const Piece_1 = require("./Piece");
 const BlockModel_1 = require("./BlockModel");
 const shared_1 = require("./shared");
@@ -8,11 +9,11 @@ const SPieceModel_1 = require("./SPieceModel");
 const ZPieceBlockModel_1 = require("./ZPieceBlockModel");
 const LPieceModel_1 = require("./LPieceModel");
 const LongPieceModel_1 = require("./LongPieceModel");
-const index_2 = require("../node_modules/taco-bell/index");
 const index_3 = require("../node_modules/taco-bell/index");
 const index_4 = require("../node_modules/taco-bell/index");
-const PyramidPieceModel_1 = require("./PyramidPieceModel");
 const index_5 = require("../node_modules/taco-bell/index");
+const PyramidPieceModel_1 = require("./PyramidPieceModel");
+const index_6 = require("../node_modules/taco-bell/index");
 const LEFT_KEYCODE = 37;
 const UP_KEYCODE = 38;
 const RIGHT_KEYCODE = 39;
@@ -51,16 +52,16 @@ var State;
 })(State || (State = {}));
 class TetrisModel {
     constructor() {
-        this.message = new index_3.ModelElement();
-        this.showMessage = new index_3.ModelElement(false);
-        this.state = new index_3.ModelElement(State.INIT);
-        this.score = new index_3.ModelElement(0);
-        this.pieceCount = new index_3.ModelElement(0);
-        this.lineCount = new index_3.ModelElement(0);
-        this.level = new index_5.FunctionalElement(function (pieceCount) {
+        this.message = new index_4.ModelElement();
+        this.showMessage = new index_4.ModelElement(false);
+        this.state = new index_4.ModelElement(State.INIT);
+        this.score = new index_4.ModelElement(0);
+        this.pieceCount = new index_4.ModelElement(0);
+        this.lineCount = new index_4.ModelElement(0);
+        this.level = new index_6.FunctionalElement(function (pieceCount) {
             return Math.ceil((pieceCount + 1) / PIECES_PER_LEVEL);
         }, this.pieceCount);
-        this.tickLength = new index_5.FunctionalElement(function (level) {
+        this.tickLength = new index_6.FunctionalElement(function (level) {
             return 1000 / Math.log2(level + 1);
         }, this.level);
     }
@@ -108,57 +109,49 @@ class Tetris {
                     this.pause();
                     break;
             }
+            index_1.ComponentQueue.cycle();
         });
-        this.svg = new index_1.SVGComponent("svg")
+        this.svg = new index_2.SVGComponent("svg")
             .withAttribute("width", BlockModel_1.BlockModel.SIDE_LENGTH * shared_1.gameWidth)
             .withAttribute("height", BlockModel_1.BlockModel.SIDE_LENGTH * shared_1.gameHeight)
-            .child(new index_1.SVGComponent("rect")
+            .child(new index_2.SVGComponent("rect")
             .withAttribute("x", 0)
             .withAttribute("y", 0)
             .withAttribute("width", BlockModel_1.BlockModel.SIDE_LENGTH * shared_1.gameWidth)
             .withAttribute("height", BlockModel_1.BlockModel.SIDE_LENGTH * shared_1.gameHeight)
-            .withAttribute("style", "fill: #000000;")
-            .reinit())
-            .reinit();
-        new index_2.Component("div", document.getElementById("app-root"))
+            .withAttribute("style", "fill: #000000;"));
+        new index_3.Component("div", document.getElementById("app-root"))
             .withClass("game")
-            .child(new index_2.Component("div")
+            .child(new index_3.Component("div")
             .withClass("header")
-            .child(new index_2.Component("span")
+            .child(new index_3.Component("span")
             .withClass("score"))
-            .child(new index_2.Component("span")
+            .child(new index_3.Component("span")
             .withText("Start")
-            .withClass("btn start", new index_4.Binding(this.model.state, function (state) {
+            .withClass("btn start", new index_5.Binding(this.model.state, function (state) {
             return state == State.INIT || state == State.GAMEOVER ? "" : "hidden";
-        })).on("click", this.restart.bind(this))
-            .reinit(), new index_2.Component("span")
-            .withClass("level", new index_4.Binding(this.model.state, function (state) {
+        })).on("click", this.restart.bind(this)), new index_3.Component("span")
+            .withClass("level", new index_5.Binding(this.model.state, function (state) {
             return state == State.INIT || state == State.GAMEOVER ? "hidden" : "";
         }))
-            .withText(new index_4.Binding(this.model.level, function (level) {
+            .withText(new index_5.Binding(this.model.level, function (level) {
             return "Level " + level;
-        }))
-            .reinit(), new index_2.Component("label")
+        })), new index_3.Component("label")
             .withClass("score")
-            .withText(this.model.score)
-            .reinit(), new index_2.Component("label")
+            .withText(this.model.score), new index_3.Component("label")
             .withClass("line-count")
-            .withText(this.model.lineCount)
-            .reinit(), new index_2.Component("span")
-            .withText(new index_4.Binding(this.model.state, function (state) {
+            .withText(this.model.lineCount), new index_3.Component("span")
+            .withText(new index_5.Binding(this.model.state, function (state) {
             return state == State.PAUSED ? "Resume" : "Pause";
         }))
             .withClass("btn pause")
-            .on("click", this.pause.bind(this))
-            .reinit()).reinit()
-            .child(new index_2.Component("h1")
+            .on("click", this.pause.bind(this)))
+            .child(new index_3.Component("h1")
             .withText(this.model.message)
-            .withClass("message", new index_4.Binding(this.model.showMessage, function (showing) {
+            .withClass("message", new index_5.Binding(this.model.showMessage, function (showing) {
             return showing ? "" : "hidden";
-        }))
-            .reinit())).reinit()
-            .child(this.svg)
-            .reinit();
+        }))))
+            .child(this.svg);
     }
     restart() {
         if (this.timeoutHandle)
@@ -201,6 +194,7 @@ class Tetris {
                     return;
                 }
             }
+            index_1.ComponentQueue.cycle();
             this.model.currentPiece.move(this, shared_1.Direction.DOWN);
             this.tick();
         }.bind(this), this.model.tickLength.get());
@@ -288,4 +282,5 @@ class Tetris {
 }
 exports.Tetris = Tetris;
 const tetris = new Tetris();
+index_1.ComponentQueue.cycle();
 window["tetris"] = tetris;

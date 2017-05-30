@@ -19,8 +19,7 @@ export class Piece {
                 .withAttribute("y", blockModel.y)
                 .withAttribute("width", BlockModel.SIDE_LENGTH)
                 .withAttribute("height", BlockModel.SIDE_LENGTH)
-                .withAttribute("style","stroke: #000000; fill: " + color + ";")
-                .reinit();
+                .withAttribute("style","stroke: #000000; fill: " + color + ";");
             blockModel.bindComponent(blockComponent);
             this.blocks.push(blockComponent);
         }
